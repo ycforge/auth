@@ -5,6 +5,7 @@ import { StaticCredentialsProvider } from '@ydbjs/auth/static';
 
 import { AuthConfigurationError } from '../core/errors.js';
 import type { AuthManager } from '../core/manager.js';
+import { YDB_AUTH_USAGE } from '../core/types.js';
 
 /** Options for the YDB credentials adapter. */
 export interface YdbCredentialsAdapterOptions {
@@ -25,7 +26,7 @@ export interface YdbCredentialsAdapterOptions {
 
 /**
  * CredentialsProvider delegating every getToken() call to the AuthManager
- * with usage "ydb".
+ * with usage {@link YDB_AUTH_USAGE}.
  */
 class YdbAdapterCredentialsProvider extends CredentialsProvider {
   #auth: AuthManager;
@@ -36,7 +37,7 @@ class YdbAdapterCredentialsProvider extends CredentialsProvider {
   }
 
   getToken(force?: boolean, signal?: AbortSignal): Promise<string> {
-    return this.#auth.getToken('ydb', { force, signal });
+    return this.#auth.getToken(YDB_AUTH_USAGE, { force, signal });
   }
 }
 
@@ -48,7 +49,7 @@ class YdbAdapterCredentialsProvider extends CredentialsProvider {
  *   @ydbjs/auth (requires options.endpoint; it performs the gRPC login).
  * - "anonymous" → AnonymousCredentialsProvider from @ydbjs/auth.
  * - everything else → a thin CredentialsProvider delegating getToken() to
- *   auth.getToken('ydb'), including usage validation.
+ *   auth.getToken(YDB_AUTH_USAGE), including usage validation.
  */
 export function createYdbCredentialsProvider(
   auth: AuthManager,

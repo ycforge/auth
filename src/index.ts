@@ -7,6 +7,8 @@ export { retry, markNonRetryable, isNonRetryable } from './core/retry.js';
 export type { RetryOptions } from './core/retry.js';
 export {
   SUPPORTED_STRATEGIES,
+  YCLOUD_AUTH_USAGE,
+  YDB_AUTH_USAGE,
   type AuthStrategyConfig,
   type AuthStrategyType,
   type AuthUsage,

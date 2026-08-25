@@ -6,8 +6,14 @@ export interface TokenProvider {
   getToken(force?: boolean, signal?: AbortSignal): Promise<string>;
 }
 
+/** Usage scope for Yandex Cloud APIs (e.g. KMS). */
+export const YCLOUD_AUTH_USAGE = 'ycloud' as const;
+
+/** Usage scope for YDB. */
+export const YDB_AUTH_USAGE = 'ydb' as const;
+
 /** Where the token will be used: generic Yandex Cloud API or YDB. */
-export type AuthUsage = 'ycloud' | 'ydb';
+export type AuthUsage = typeof YCLOUD_AUTH_USAGE | typeof YDB_AUTH_USAGE;
 
 export type AuthStrategyType = AuthStrategyConfig['type'];
 
@@ -53,8 +59,8 @@ export type AuthStrategyConfig =
 export const SUPPORTED_STRATEGIES: Readonly<
   Record<AuthUsage, readonly AuthStrategyType[]>
 > = {
-  ycloud: ['iam_token', 'metadata', 'auth_key'],
-  ydb: [
+  [YCLOUD_AUTH_USAGE]: ['iam_token', 'metadata', 'auth_key'],
+  [YDB_AUTH_USAGE]: [
     'iam_token',
     'metadata',
     'auth_key',
