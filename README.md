@@ -110,27 +110,61 @@ compatibility is validated on every `getToken()` call.
 
 Requires the optional peer `@ydbjs/auth` (>= 6).
 
+### Why the adapter exists
+
+`@ydbjs/auth` (the auth layer used by the YDB JS SDK) expects a
+`CredentialsProvider` object. That object must implement `getToken()` and
+already know how to inject the returned value into gRPC metadata as
+`x-ydb-auth-ticket`. The `@ycforge/auth/ydb` adapter turns your
+`AuthManager` into exactly that `CredentialsProvider`, so the same auth
+configuration can be reused for both Yandex Cloud REST APIs and YDB.
+
+### Why endpoint / secure / channelOptions?
+
+Most strategies do **not** need a YDB endpoint. The adapter only requires it
+for the `static` (username/password) strategy, because
+`StaticCredentialsProvider` from `@ydbjs/auth` performs a gRPC `Login` call
+against the YDB endpoint to exchange credentials for an auth ticket.
+
+For `iam_token`, `metadata`, `auth_key`, `access_token` and `anonymous` the
+adapter ignores `endpoint`, `secure` and `channelOptions` — it simply calls
+`auth.getToken('ydb')` and lets `@ycforge/auth` handle token caching and
+refresh.
+
+### Usage examples
+
 ```ts
+import { createAuth, authKeyFromFile } from '@ycforge/auth';
 import { createYdbCredentialsProvider } from '@ycforge/auth/ydb';
 
-const credentials = createYdbCredentialsProvider(auth);
-// driver usage (ydb-js-sdk): pass `credentials` where a CredentialsProvider
-// is expected; its middleware injects the token as `x-ydb-auth-ticket`.
+// Strategies that do NOT need an endpoint:
+const authKey = createAuth(authKeyFromFile('./authorized_key.json'));
+const iam = createAuth({ type: 'iam_token', token: process.env.IAM_TOKEN! });
+const meta = createAuth({ type: 'metadata' });
+const anon = createAuth({ type: 'anonymous' });
 
-// username/password login needs the YDB endpoint:
-const staticCreds = createYdbCredentialsProvider(auth, {
+const creds = createYdbCredentialsProvider(authKey);
+// Pass `creds` to the ydb-js-sdk Driver where a CredentialsProvider is expected.
+
+// Username/password login DOES need the YDB endpoint:
+const staticAuth = createAuth({
+  type: 'static',
+  username: 'user',
+  password: 'pass',
+});
+const staticCreds = createYdbCredentialsProvider(staticAuth, {
   endpoint: 'grpcs://ydb.serverless.yandexcloud.net:2135',
-  secure: true, // default; false for local insecure YDB
+  secure: true, // default; set false for local insecure YDB (grpc://)
 });
 ```
 
-Strategy mapping:
+### Strategy mapping
 
-- `static` → `StaticCredentialsProvider` from `@ydbjs/auth`
-  (`options.endpoint` required),
-- `anonymous` → `AnonymousCredentialsProvider`,
-- everything else → a thin `CredentialsProvider` delegating `getToken()` to
-  `auth.getToken('ydb')`.
+| Strategy       | What the adapter returns                              | Needs `endpoint` |
+| -------------- | ----------------------------------------------------- | ---------------- |
+| `static`       | `StaticCredentialsProvider` from `@ydbjs/auth`        | yes              |
+| `anonymous`    | `AnonymousCredentialsProvider` from `@ydbjs/auth`     | no               |
+| everything else| Thin `CredentialsProvider` delegating to `auth.getToken('ydb')` | no               |
 
 ## NestJS module (`@ycforge/auth/nestjs`)
 
