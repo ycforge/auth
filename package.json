@@ -1,6 +1,6 @@
 {
   "name": "@ycforge/auth",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Shared authentication strategies for Yandex Cloud (IAM tokens, metadata service, service account keys) and YDB, with adapters for @ydbjs/auth and NestJS",
   "keywords": [
     "auth",
