@@ -5,7 +5,7 @@ import { StaticCredentialsProvider } from '@ydbjs/auth/static';
 
 import { AuthConfigurationError } from '../core/errors.js';
 import type { AuthManager } from '../core/manager.js';
-import { YDB_AUTH_USAGE } from '../core/types.js';
+import { YDB_AUTH_USAGE, type AuthUsage } from '../core/types.js';
 
 /** Options for the YDB credentials adapter. */
 export interface YdbCredentialsAdapterOptions {
@@ -26,18 +26,20 @@ export interface YdbCredentialsAdapterOptions {
 
 /**
  * CredentialsProvider delegating every getToken() call to the AuthManager
- * with usage {@link YDB_AUTH_USAGE}.
+ * with the requested usage.
  */
 class YdbAdapterCredentialsProvider extends CredentialsProvider {
   #auth: AuthManager;
+  #usage: AuthUsage;
 
-  constructor(auth: AuthManager) {
+  constructor(auth: AuthManager, usage: AuthUsage) {
     super();
     this.#auth = auth;
+    this.#usage = usage;
   }
 
   getToken(force?: boolean, signal?: AbortSignal): Promise<string> {
-    return this.#auth.getToken(YDB_AUTH_USAGE, { force, signal });
+    return this.#auth.getToken(this.#usage, { force, signal });
   }
 }
 
@@ -45,19 +47,33 @@ class YdbAdapterCredentialsProvider extends CredentialsProvider {
  * Adapts an AuthManager to a @ydbjs/auth CredentialsProvider usable with
  * the ydb-js-sdk driver.
  *
+ * @param auth - AuthManager to adapt.
+ * @param usage - Target usage scope ('ydb' or 'ycloud'). Passed to every
+ *   getToken() call so the manager can validate strategy/usage compatibility.
+ * @param options - Optional settings; endpoint/secure/channelOptions are only
+ *   used by the 'static' strategy.
+ *
  * - "static" (username/password) → StaticCredentialsProvider from
  *   @ydbjs/auth (requires options.endpoint; it performs the gRPC login).
+ *   Only allowed with usage 'ydb'.
  * - "anonymous" → AnonymousCredentialsProvider from @ydbjs/auth.
  * - everything else → a thin CredentialsProvider delegating getToken() to
- *   auth.getToken(YDB_AUTH_USAGE), including usage validation.
+ *   auth.getToken(usage), including usage validation.
  */
 export function createYdbCredentialsProvider(
   auth: AuthManager,
+  usage: AuthUsage,
   options: YdbCredentialsAdapterOptions = {},
 ): CredentialsProvider {
   const config = auth.config;
 
   if (config.type === 'static') {
+    if (usage !== YDB_AUTH_USAGE) {
+      throw new AuthConfigurationError(
+        'The "static" (username/password) strategy can only be used with YDB usage ' +
+          `(${YDB_AUTH_USAGE}), got "${usage}".`,
+      );
+    }
     if (!options.endpoint) {
       throw new AuthConfigurationError(
         'The "static" (username/password) strategy requires options.endpoint ' +
@@ -77,5 +93,5 @@ export function createYdbCredentialsProvider(
     return new AnonymousCredentialsProvider();
   }
 
-  return new YdbAdapterCredentialsProvider(auth);
+  return new YdbAdapterCredentialsProvider(auth, usage);
 }

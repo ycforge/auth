@@ -1,72 +1,72 @@
 # @ycforge/auth
 
-Shared authentication logic for Yandex Cloud APIs and YDB, extracted from
-`@ycforge/ydb-orm` and `@ycforge/yandex-kms-orm-provider`.
+Общая логика аутентификации для API Яндекс Облака и YDB, выделенная из
+`@ycforge/ydb-orm` и `@ycforge/yandex-kms-orm-provider`.
 
-- Zero runtime dependencies in the core (Node builtins + global `fetch` only).
-- Token caching with 60s leeway and single-flight refresh.
-- Small built-in exponential-backoff retry (5 attempts, base 100 ms, factor 10).
-- Capability matrix: each token request is validated against the target usage.
-- Optional adapters: `@ydbjs/auth` (YDB driver) and NestJS.
+- Нулевое количество runtime-зависимостей в ядре (только Node.js builtins + глобальный `fetch`).
+- Кэширование токенов с запасом 60 секунд и single-flight обновлением.
+- Встроенный retry с экспоненциальным бэкоффом (5 попыток, базовая задержка 100 мс, множитель 10).
+- Capability-матрица: каждый запрос токена проверяется на совместимость с целевым использованием.
+- Опциональные адаптеры: `@ydbjs/auth` (драйвер YDB) и NestJS.
 
-Requires Node.js >= 22 (ESM).
+Требуется Node.js >= 22 (ESM).
 
-## Installation
+## Установка
 
 ```bash
 yarn add @ycforge/auth
-# optional, for the YDB adapter:
+# опционально, для YDB-адаптера:
 yarn add @ydbjs/auth
-# optional, for the NestJS module:
+# опционально, для NestJS-модуля:
 yarn add @nestjs/common reflect-metadata
 ```
 
-## Quick start
+## Быстрый старт
 
 ```ts
-import { createAuth } from '@ycforge/auth';
+import { createAuth, YCLOUD_AUTH_USAGE } from '@ycforge/auth';
 
 const auth = createAuth({ type: 'metadata' });
-const token = await auth.getToken('ycloud');
+const token = await auth.getToken(YCLOUD_AUTH_USAGE);
 ```
 
-## Strategies
+## Стратегии
 
-### `iam_token` — static IAM token
+### `iam_token` — статический IAM-токен
 
 ```ts
 const auth = createAuth({
   type: 'iam_token',
   token: process.env.IAM_TOKEN!,
-  // optional: once this time passes, getToken() throws instead of
-  // handing out a known-dead token (Date, ISO string or unix s/ms)
+  // опционально: после наступления этого момента getToken() будет бросать ошибку
+  // вместо возврата заведомо протухшего токена (Date, ISO-строка или unix s/ms)
   expiresAt: '2026-09-01T00:00:00Z',
 });
 ```
 
-### `metadata` — VM metadata service
+### `metadata` — сервис метаданных ВМ
 
 ```ts
 const auth = createAuth({
   type: 'metadata',
-  // defaults shown below:
+  // значения по умолчанию:
   endpoint:
     'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token',
   flavor: 'Google',
 });
 ```
 
-### `auth_key` — service account authorized key
+### `auth_key` — авторизованный ключ сервисного аккаунта
 
-Signs a PS256 JWT and exchanges it for an IAM token at
-`https://iam.api.cloud.yandex.net/iam/v1/tokens` (10s per-request timeout,
-retry with backoff, HTTP error bodies are never logged).
+Подписывает JWT с алгоритмом PS256 и обменивает его на IAM-токен по адресу
+`https://iam.api.cloud.yandex.net/iam/v1/tokens` (таймаут 10 с на запрос,
+retry с бэкоффом, тела HTTP-ошибок никогда не логируются).
 
 ```ts
 import { createAuth, authKeyFromFile } from '@ycforge/auth';
 
 const auth = createAuth(authKeyFromFile('./authorized_key.json'));
-// or inline:
+// или inline:
 const auth2 = createAuth({
   type: 'auth_key',
   keyId: 'aje...',
@@ -75,22 +75,22 @@ const auth2 = createAuth({
 });
 ```
 
-### `access_token` / `anonymous` / `static` (YDB only)
+### `access_token` / `anonymous` / `static` (только YDB)
 
 ```ts
 createAuth({ type: 'access_token', token: '...' });
-createAuth({ type: 'anonymous' }); // empty token
+createAuth({ type: 'anonymous' }); // пустой токен
 createAuth({ type: 'static', username: 'user', password: 'pass' });
 ```
 
-The `static` (username/password) strategy cannot fetch a token without a YDB
-gRPC endpoint: in the core its `getToken()` throws with a hint to use the
-`@ycforge/auth/ydb` adapter, which delegates to `StaticCredentialsProvider`
-from `@ydbjs/auth`.
+Стратегия `static` (username/password) не может получить токен без YDB gRPC
+эндпоинта: в ядре её `getToken()` бросает ошибку с подсказкой использовать
+адаптер `@ycforge/auth/ydb`, который делегирует вызовы
+`StaticCredentialsProvider` из `@ydbjs/auth`.
 
-## Capability matrix
+## Capability-матрица
 
-| Strategy       | `ycloud` | `ydb` |
+| Стратегия      | `ycloud` | `ydb` |
 | -------------- | -------- | ----- |
 | `iam_token`    | ✅       | ✅    |
 | `metadata`     | ✅       | ✅    |
@@ -99,76 +99,84 @@ from `@ydbjs/auth`.
 | `anonymous`    | ❌       | ✅    |
 | `static`       | ❌       | ✅    |
 
-Requesting a token for an unsupported usage throws
-`UnsupportedAuthMethodError` naming the usage, the strategy and the
-supported strategies.
+Запрос токена для неподдерживаемого использования бросает
+`UnsupportedAuthMethodError`, указывая usage, стратегию и список поддерживаемых
+стратегий.
 
-`auth.getProvider(usage?)` returns a `TokenProvider`; when a usage is given,
-compatibility is validated on every `getToken()` call.
+`auth.getProvider(usage?)` возвращает `TokenProvider`; если usage передан,
+совместимость проверяется на каждом вызове `getToken()`.
 
-## YDB adapter (`@ycforge/auth/ydb`)
+## YDB-адаптер (`@ycforge/auth/ydb`)
 
-Requires the optional peer `@ydbjs/auth` (>= 6).
+Требует опционального peer-зависимости `@ydbjs/auth` (>= 6).
 
-### Why the adapter exists
+### Зачем нужен адаптер
 
-`@ydbjs/auth` (the auth layer used by the YDB JS SDK) expects a
-`CredentialsProvider` object. That object must implement `getToken()` and
-already know how to inject the returned value into gRPC metadata as
-`x-ydb-auth-ticket`. The `@ycforge/auth/ydb` adapter turns your
-`AuthManager` into exactly that `CredentialsProvider`, so the same auth
-configuration can be reused for both Yandex Cloud REST APIs and YDB.
+`@ydbjs/auth` (слой аутентификации YDB JS SDK) ожидает объект
+`CredentialsProvider`. Этот объект должен реализовывать `getToken()` и уже
+уметь подставлять возвращаемое значение в gRPC-метаданные как
+`x-ydb-auth-ticket`. Адаптер `@ycforge/auth/ydb` превращает ваш `AuthManager`
+именно в такой `CredentialsProvider`, поэтому одна и та же конфигурация
+аутентификации может использоваться и для REST API Яндекс Облака, и для YDB.
 
-### Why endpoint / secure / channelOptions?
+### Зачем нужны `endpoint` / `secure` / `channelOptions`?
 
-Most strategies do **not** need a YDB endpoint. The adapter only requires it
-for the `static` (username/password) strategy, because
-`StaticCredentialsProvider` from `@ydbjs/auth` performs a gRPC `Login` call
-against the YDB endpoint to exchange credentials for an auth ticket.
+Большинству стратегий YDB-эндпоинт **не нужен**. Адаптер требует его только
+для стратегии `static` (username/password), потому что
+`StaticCredentialsProvider` из `@ydbjs/auth` выполняет gRPC-вызов `Login` к
+YDB-эндпоинту для обмена учётных данных на auth ticket.
 
-For `iam_token`, `metadata`, `auth_key`, `access_token` and `anonymous` the
-adapter ignores `endpoint`, `secure` and `channelOptions` — it simply calls
-`auth.getToken('ydb')` and lets `@ycforge/auth` handle token caching and
-refresh.
+Для `iam_token`, `metadata`, `auth_key`, `access_token` и `anonymous`
+параметры `endpoint`, `secure` и `channelOptions` игнорируются — адаптер просто
+вызывает `auth.getToken(usage)` и позволяет `@ycforge/auth` заниматься
+кэшированием и обновлением токена.
 
-### Usage examples
+### Примеры использования
+
+Первый аргумент адаптера — `AuthManager`, второй обязательный аргумент —
+`usage` (`'ydb'` или `'ycloud'`), третий опциональный — настройки
+`YdbCredentialsAdapterOptions`.
 
 ```ts
-import { createAuth, authKeyFromFile } from '@ycforge/auth';
+import { createAuth, authKeyFromFile, YDB_AUTH_USAGE } from '@ycforge/auth';
 import { createYdbCredentialsProvider } from '@ycforge/auth/ydb';
 
-// Strategies that do NOT need an endpoint:
+// Стратегии, которым НЕ нужен endpoint:
 const authKey = createAuth(authKeyFromFile('./authorized_key.json'));
 const iam = createAuth({ type: 'iam_token', token: process.env.IAM_TOKEN! });
 const meta = createAuth({ type: 'metadata' });
 const anon = createAuth({ type: 'anonymous' });
 
-const creds = createYdbCredentialsProvider(authKey);
-// Pass `creds` to the ydb-js-sdk Driver where a CredentialsProvider is expected.
+const creds = createYdbCredentialsProvider(authKey, YDB_AUTH_USAGE);
+// Передайте `creds` в Driver ydb-js-sdk там, где ожидается CredentialsProvider.
 
-// Username/password login DOES need the YDB endpoint:
+// Для логина по логину/паролю endpoint НУЖЕН:
 const staticAuth = createAuth({
   type: 'static',
   username: 'user',
   password: 'pass',
 });
-const staticCreds = createYdbCredentialsProvider(staticAuth, {
+const staticCreds = createYdbCredentialsProvider(staticAuth, YDB_AUTH_USAGE, {
   endpoint: 'grpcs://ydb.serverless.yandexcloud.net:2135',
-  secure: true, // default; set false for local insecure YDB (grpc://)
+  secure: true, // по умолчанию; установите false для локального незащищённого YDB (grpc://)
 });
 ```
 
-### Strategy mapping
+Стратегия `static` работает только с `usage === 'ydb'`. При попытке передать
+`'ycloud'` адаптер бросит `AuthConfigurationError`.
 
-| Strategy       | What the adapter returns                              | Needs `endpoint` |
-| -------------- | ----------------------------------------------------- | ---------------- |
-| `static`       | `StaticCredentialsProvider` from `@ydbjs/auth`        | yes              |
-| `anonymous`    | `AnonymousCredentialsProvider` from `@ydbjs/auth`     | no               |
-| everything else| Thin `CredentialsProvider` delegating to `auth.getToken('ydb')` | no               |
+### Маппинг стратегий
 
-## NestJS module (`@ycforge/auth/nestjs`)
+| Стратегия       | Что возвращает адаптер                                       | Нужен `endpoint` |
+| --------------- | ------------------------------------------------------------ | ---------------- |
+| `static`        | `StaticCredentialsProvider` из `@ydbjs/auth`                 | да               |
+| `anonymous`     | `AnonymousCredentialsProvider` из `@ydbjs/auth`              | нет              |
+| всё остальное   | Тонкий `CredentialsProvider`, делегирующий `auth.getToken(usage)` | нет              |
 
-Requires the optional peers `@nestjs/common` (>= 10) and `reflect-metadata`.
+## NestJS-модуль (`@ycforge/auth/nestjs`)
+
+Требует опциональных peer-зависимостей `@nestjs/common` (>= 10) и
+`reflect-metadata`.
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -183,9 +191,9 @@ import type { AuthManager } from '@ycforge/auth';
   imports: [
     YcAuthModule.forRoot({
       config: { type: 'metadata' },
-      global: true, // optional
+      global: true, // опционально
     }),
-    // or asynchronously:
+    // или асинхронно:
     // YcAuthModule.forRootAsync({
     //   inject: [ConfigService],
     //   useFactory: (cfg: ConfigService) => cfg.get('auth'),
@@ -200,13 +208,13 @@ export class SomeService {
 }
 ```
 
-The manager is provided under the `YCFORGE_AUTH` symbol and is also
-retrievable via `moduleRef.get(YCFORGE_AUTH)`.
+Менеджер предоставляется под символом `YCFORGE_AUTH` и также доступен через
+`moduleRef.get(YCFORGE_AUTH)`.
 
-### Example: sharing one `AuthManager` with `@ycforge/ydb-orm`
+### Пример: использование одного `AuthManager` с `@ycforge/ydb-orm`
 
-If you already have `YcAuthModule` registered, you can inject the same
-`AuthManager` into the YDB ORM module instead of duplicating credentials.
+Если у вас уже зарегистрирован `YcAuthModule`, можно внедрить тот же
+`AuthManager` в модуль YDB ORM вместо дублирования учётных данных.
 
 ```ts
 import { Module, Inject } from '@nestjs/common';
@@ -224,7 +232,7 @@ import type { AuthManager } from '@ycforge/auth';
       useFactory: (auth: AuthManager) => ({
         endpoint: 'grpcs://ydb.serverless.yandexcloud.net:2135',
         database: '/ru-central1/.../...',
-        auth, // let ydb-orm wrap it into a CredentialsProvider for YDB
+        auth, // ydb-orm сам обернёт его в CredentialsProvider для YDB
       }),
       inject: [YCFORGE_AUTH],
     }),
@@ -233,16 +241,16 @@ import type { AuthManager } from '@ycforge/auth';
 export class AppModule {}
 ```
 
-The ORM will use the injected `auth` manager and request tokens with usage
-`'ydb'`. If the configured strategy is incompatible with YDB (e.g. an
-`access_token` used where IAM is expected), you get the same behaviour as
-passing a custom `CredentialsProvider`.
+ORM будет использовать внедрённый `auth`-менеджер и запрашивать токены с
+usage `'ydb'`. Если настроенная стратегия несовместима с YDB (например,
+`access_token` там, где ожидается IAM), поведение будет таким же, как при
+передаче произвольного `CredentialsProvider`.
 
-### Example: sharing one `AuthManager` with `@ycforge/orm-security-providers`
+### Пример: использование одного `AuthManager` с `@ycforge/orm-security-providers`
 
-Use the same `AuthManager` for Yandex Cloud security providers. Register the
-module once and inject the manager where the provider expects it; the provider
-will request tokens with usage `'ycloud'`.
+Используйте тот же `AuthManager` для security-провайдеров Яндекс Облака.
+Зарегистрируйте модуль один раз и внедряйте менеджер туда, где его ожидает
+провайдер; провайдер будет запрашивать токены с usage `'ycloud'`.
 
 ```ts
 import { Module } from '@nestjs/common';
@@ -268,10 +276,10 @@ import type { AuthManager } from '@ycforge/auth';
 export class AppModule {}
 ```
 
-A single `AuthManager` instance now serves both YDB and YCloud consumers; each
-consumer requests the appropriate usage (`'ydb'` or `'ycloud'`).
+Один экземпляр `AuthManager` теперь обслуживает и YDB, и YCloud потребителей;
+каждый потребитель запрашивает нужный usage (`'ydb'` или `'ycloud'`).
 
-## Scripts
+## Скрипты
 
 ```bash
 yarn build   # tsc → dist/
@@ -279,6 +287,6 @@ yarn test    # jest (ESM, ts-jest)
 yarn lint    # eslint + prettier
 ```
 
-## License
+## Лицензия
 
 MIT
