@@ -189,6 +189,77 @@ export class SomeService {
 The manager is provided under the `YCFORGE_AUTH` symbol and is also
 retrievable via `moduleRef.get(YCFORGE_AUTH)`.
 
+### Example: sharing one `AuthManager` with `@ycforge/ydb-orm`
+
+If you already have `YcAuthModule` registered, you can inject the same
+`AuthManager` into the YDB ORM module instead of duplicating credentials.
+
+```ts
+import { Module, Inject } from '@nestjs/common';
+import { YdbModule } from '@ycforge/ydb-orm';
+import { YCFORGE_AUTH, YcAuthModule, InjectAuth } from '@ycforge/auth/nestjs';
+import type { AuthManager } from '@ycforge/auth';
+
+@Module({
+  imports: [
+    YcAuthModule.forRoot({
+      config: { type: 'metadata' },
+      global: true,
+    }),
+    YdbModule.forRootAsync({
+      useFactory: (auth: AuthManager) => ({
+        endpoint: 'grpcs://ydb.serverless.yandexcloud.net:2135',
+        database: '/ru-central1/.../...',
+        auth, // let ydb-orm wrap it into a CredentialsProvider for YDB
+      }),
+      inject: [YCFORGE_AUTH],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+The ORM will pick the `auth` option and adapt it with usage `'ydb'`. If the
+selected config is incompatible with YDB (e.g. an `iam_token` used with a
+local insecure endpoint works, but `metadata` inside non-YC VM will simply
+fail at fetch time), you get the same behaviour as passing a custom
+`CredentialsProvider`.
+
+### Example: multiple configs for YCloud + YDB
+
+```ts
+YcAuthModule.forRoot({
+  global: true,
+  configs: {
+    ycloud: authKeyFromFile('./keys/kms-key.json'),
+    ydb: { type: 'anonymous' },
+  },
+});
+
+// KMS provider uses the 'ycloud' config:
+YandexKmsModule.forRootAsync({
+  useFactory: (auth: AuthManager) => ({
+    keyId: process.env.KMS_KEY_ID!,
+    auth,
+    authConfigName: 'ycloud',
+  }),
+  inject: [YCFORGE_AUTH],
+});
+
+// YDB ORM uses the 'ydb' config:
+YdbModule.forRootAsync({
+  useFactory: (auth: AuthManager) => ({
+    endpoint: 'grpc://localhost:2136',
+    auth,
+    authConfigName: 'ydb',
+  }),
+  inject: [YCFORGE_AUTH],
+});
+```
+
+A single `AuthManager` instance now serves both services, while each consumer
+requests the correct named config and usage (`'ycloud'` or `'ydb'`).
+
 ## Scripts
 
 ```bash
