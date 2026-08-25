@@ -22,7 +22,7 @@ export class UnsupportedAuthMethodError extends AuthError {
   ) {
     super(
       `Auth strategy "${strategyType}" is not supported for usage "${usage}". ` +
-        `Supported strategies for "${usage}": ${supported.join(", ")}`,
+        `Supported strategies for "${usage}": ${supported.join(', ')}`,
     );
     this.usage = usage;
     this.strategyType = strategyType;

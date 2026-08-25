@@ -1,8 +1,8 @@
-import fs from "node:fs";
-import crypto from "node:crypto";
+import fs from 'node:fs';
+import crypto from 'node:crypto';
 
-import { AuthConfigurationError } from "./errors.js";
-import type { AuthStrategyConfig } from "./types.js";
+import { AuthConfigurationError } from './errors.js';
+import type { AuthStrategyConfig } from './types.js';
 
 /**
  * Reads a service account authorized key JSON file
@@ -12,8 +12,8 @@ import type { AuthStrategyConfig } from "./types.js";
  */
 export function authKeyFromFile(
   path: string,
-): Extract<AuthStrategyConfig, { type: "auth_key" }> {
-  const raw = fs.readFileSync(path, "utf-8");
+): Extract<AuthStrategyConfig, { type: 'auth_key' }> {
+  const raw = fs.readFileSync(path, 'utf-8');
   const json = JSON.parse(raw) as Record<string, unknown>;
 
   if (!json.id || !json.service_account_id || !json.private_key) {
@@ -31,7 +31,7 @@ export function authKeyFromFile(
   }
 
   return {
-    type: "auth_key",
+    type: 'auth_key',
     keyId: json.id as string,
     serviceAccountId: json.service_account_id as string,
     privateKey: json.private_key as string,

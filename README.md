@@ -103,28 +103,8 @@ Requesting a token for an unsupported usage throws
 `UnsupportedAuthMethodError` naming the usage, the strategy and the
 supported strategies.
 
-## Multiple named configs
-
-```ts
-const auth = createAuth({
-  configs: {
-    default: { type: 'metadata' },
-    ycloud: { type: 'auth_key', /* ... */ },
-    ydb: { type: 'static', username: 'u', password: 'p' },
-  },
-});
-
-await auth.getToken('ycloud');          // config named after the usage
-await auth.getToken('ydb');             // the "ydb" config
-await auth.getToken('ycloud', 'other'); // explicit config name wins
-```
-
-Selection order: explicit name → config named after the usage → `default` →
-the only config (when there is exactly one). When nothing matches,
-`AuthConfigurationError` is thrown with the list of available names.
-
-`auth.getProvider(usage?, configName?)` returns a `TokenProvider`; when a
-usage is given, compatibility is validated on every `getToken()` call.
+`auth.getProvider(usage?)` returns a `TokenProvider`; when a usage is given,
+compatibility is validated on every `getToken()` call.
 
 ## YDB adapter (`@ycforge/auth/ydb`)
 
@@ -133,12 +113,12 @@ Requires the optional peer `@ydbjs/auth` (>= 6).
 ```ts
 import { createYdbCredentialsProvider } from '@ycforge/auth/ydb';
 
-const credentials = createYdbCredentialsProvider(auth, 'ydb');
+const credentials = createYdbCredentialsProvider(auth);
 // driver usage (ydb-js-sdk): pass `credentials` where a CredentialsProvider
 // is expected; its middleware injects the token as `x-ydb-auth-ticket`.
 
 // username/password login needs the YDB endpoint:
-const staticCreds = createYdbCredentialsProvider(auth, 'ydb', {
+const staticCreds = createYdbCredentialsProvider(auth, {
   endpoint: 'grpcs://ydb.serverless.yandexcloud.net:2135',
   secure: true, // default; false for local insecure YDB
 });
@@ -150,7 +130,7 @@ Strategy mapping:
   (`options.endpoint` required),
 - `anonymous` → `AnonymousCredentialsProvider`,
 - everything else → a thin `CredentialsProvider` delegating `getToken()` to
-  `auth.getToken('ydb', configName)`.
+  `auth.getToken('ydb')`.
 
 ## NestJS module (`@ycforge/auth/nestjs`)
 
@@ -219,46 +199,43 @@ import type { AuthManager } from '@ycforge/auth';
 export class AppModule {}
 ```
 
-The ORM will pick the `auth` option and adapt it with usage `'ydb'`. If the
-selected config is incompatible with YDB (e.g. an `iam_token` used with a
-local insecure endpoint works, but `metadata` inside non-YC VM will simply
-fail at fetch time), you get the same behaviour as passing a custom
-`CredentialsProvider`.
+The ORM will use the injected `auth` manager and request tokens with usage
+`'ydb'`. If the configured strategy is incompatible with YDB (e.g. an
+`access_token` used where IAM is expected), you get the same behaviour as
+passing a custom `CredentialsProvider`.
 
-### Example: multiple configs for YCloud + YDB
+### Example: sharing one `AuthManager` with `@ycforge/orm-security-providers`
+
+Use the same `AuthManager` for Yandex Cloud security providers. Register the
+module once and inject the manager where the provider expects it; the provider
+will request tokens with usage `'ycloud'`.
 
 ```ts
-YcAuthModule.forRoot({
-  global: true,
-  configs: {
-    ycloud: authKeyFromFile('./keys/kms-key.json'),
-    ydb: { type: 'anonymous' },
-  },
-});
+import { Module } from '@nestjs/common';
+import { YandexKmsModule } from '@ycforge/orm-security-providers';
+import { YCFORGE_AUTH, YcAuthModule } from '@ycforge/auth/nestjs';
+import type { AuthManager } from '@ycforge/auth';
 
-// KMS provider uses the 'ycloud' config:
-YandexKmsModule.forRootAsync({
-  useFactory: (auth: AuthManager) => ({
-    keyId: process.env.KMS_KEY_ID!,
-    auth,
-    authConfigName: 'ycloud',
-  }),
-  inject: [YCFORGE_AUTH],
-});
-
-// YDB ORM uses the 'ydb' config:
-YdbModule.forRootAsync({
-  useFactory: (auth: AuthManager) => ({
-    endpoint: 'grpc://localhost:2136',
-    auth,
-    authConfigName: 'ydb',
-  }),
-  inject: [YCFORGE_AUTH],
-});
+@Module({
+  imports: [
+    YcAuthModule.forRoot({
+      global: true,
+      config: authKeyFromFile('./keys/kms-key.json'),
+    }),
+    YandexKmsModule.forRootAsync({
+      useFactory: (auth: AuthManager) => ({
+        keyId: process.env.KMS_KEY_ID!,
+        auth,
+      }),
+      inject: [YCFORGE_AUTH],
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
-A single `AuthManager` instance now serves both services, while each consumer
-requests the correct named config and usage (`'ycloud'` or `'ydb'`).
+A single `AuthManager` instance now serves both YDB and YCloud consumers; each
+consumer requests the appropriate usage (`'ydb'` or `'ycloud'`).
 
 ## Scripts
 

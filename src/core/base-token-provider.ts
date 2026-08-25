@@ -1,5 +1,5 @@
-import { AuthError } from "./errors.js";
-import type { TokenProvider } from "./types.js";
+import { AuthError } from './errors.js';
+import type { TokenProvider } from './types.js';
 
 /**
  * Leeway before token expiry: without it a token could expire between
@@ -78,17 +78,17 @@ const SECONDS_TIMESTAMP_THRESHOLD = 100_000_000_000;
  * must never degrade to "expires never" silently.
  */
 export function parseTimestamp(ts: unknown): Date | null {
-  if (ts === undefined || ts === null || ts === "") return null;
+  if (ts === undefined || ts === null || ts === '') return null;
 
   let date: Date;
   if (ts instanceof Date) {
     date = new Date(ts.getTime());
-  } else if (typeof ts === "number") {
+  } else if (typeof ts === 'number') {
     if (!Number.isFinite(ts) || ts < 0) {
       throw new AuthError(`Invalid numeric timestamp: ${String(ts)}`);
     }
     date = new Date(ts <= SECONDS_TIMESTAMP_THRESHOLD ? ts * 1000 : ts);
-  } else if (typeof ts === "string") {
+  } else if (typeof ts === 'string') {
     date = new Date(ts);
   } else {
     throw new AuthError(`Invalid timestamp: unexpected type ${typeof ts}`);
@@ -97,7 +97,7 @@ export function parseTimestamp(ts: unknown): Date | null {
   if (Number.isNaN(date.getTime())) {
     throw new AuthError(
       `Invalid timestamp: ${
-        typeof ts === "string" || typeof ts === "number"
+        typeof ts === 'string' || typeof ts === 'number'
           ? String(ts)
           : typeof ts
       }`,

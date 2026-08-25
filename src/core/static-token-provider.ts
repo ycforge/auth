@@ -1,11 +1,11 @@
-import { AuthError } from "./errors.js";
+import { AuthError } from './errors.js';
 import {
   BaseTokenProvider,
   isCacheValid,
   parseTimestamp,
   type CachedToken,
-} from "./base-token-provider.js";
-import type { TokenProvider } from "./types.js";
+} from './base-token-provider.js';
+import type { TokenProvider } from './types.js';
 
 /**
  * Static token provider: returns the configured token as-is, no refresh.
@@ -35,7 +35,7 @@ export class StaticTokenProvider implements TokenProvider {
     ) {
       return Promise.reject(
         new AuthError(
-          "IAM token has expired according to its configured expiresAt; provide a fresh token",
+          'IAM token has expired according to its configured expiresAt; provide a fresh token',
         ),
       );
     }
@@ -50,7 +50,7 @@ export class StaticCredentialsUnavailableProvider extends BaseTokenProvider {
       new AuthError(
         'The "static" (username/password) strategy cannot fetch a token without a YDB endpoint. ' +
           'Use createYdbCredentialsProvider() from "@ycforge/auth/ydb", which delegates to ' +
-          "StaticCredentialsProvider from @ydbjs/auth.",
+          'StaticCredentialsProvider from @ydbjs/auth.',
       ),
     );
   }

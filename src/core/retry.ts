@@ -1,5 +1,5 @@
 /** Marker for errors that must not be retried (deterministic failures). */
-const NON_RETRYABLE = Symbol("YcForgeAuthNonRetryableError");
+const NON_RETRYABLE = Symbol('YcForgeAuthNonRetryableError');
 
 export function markNonRetryable<E extends Error>(err: E): E {
   (err as unknown as { [NON_RETRYABLE]?: boolean })[NON_RETRYABLE] = true;
@@ -31,20 +31,20 @@ export interface RetryOptions {
 function sleep(ms: number, signal?: AbortSignal): Promise<void> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      signal?.removeEventListener("abort", onAbort);
+      signal?.removeEventListener('abort', onAbort);
       resolve();
     }, ms);
     const onAbort = () => {
       clearTimeout(timer);
       reject(
-        signal?.reason instanceof Error ? signal.reason : new Error("Aborted"),
+        signal?.reason instanceof Error ? signal.reason : new Error('Aborted'),
       );
     };
     if (signal?.aborted) {
       onAbort();
       return;
     }
-    signal?.addEventListener("abort", onAbort, { once: true });
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 

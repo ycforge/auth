@@ -1,10 +1,10 @@
-import type { ChannelOptions } from "@grpc/grpc-js";
-import { CredentialsProvider } from "@ydbjs/auth";
-import { AnonymousCredentialsProvider } from "@ydbjs/auth/anonymous";
-import { StaticCredentialsProvider } from "@ydbjs/auth/static";
+import type { ChannelOptions } from '@grpc/grpc-js';
+import { CredentialsProvider } from '@ydbjs/auth';
+import { AnonymousCredentialsProvider } from '@ydbjs/auth/anonymous';
+import { StaticCredentialsProvider } from '@ydbjs/auth/static';
 
-import { AuthConfigurationError } from "../core/errors.js";
-import type { AuthManager } from "../core/manager.js";
+import { AuthConfigurationError } from '../core/errors.js';
+import type { AuthManager } from '../core/manager.js';
 
 /** Options for the YDB credentials adapter. */
 export interface YdbCredentialsAdapterOptions {
@@ -29,16 +29,14 @@ export interface YdbCredentialsAdapterOptions {
  */
 class YdbAdapterCredentialsProvider extends CredentialsProvider {
   #auth: AuthManager;
-  #configName?: string;
 
-  constructor(auth: AuthManager, configName?: string) {
+  constructor(auth: AuthManager) {
     super();
     this.#auth = auth;
-    this.#configName = configName;
   }
 
   getToken(force?: boolean, signal?: AbortSignal): Promise<string> {
-    return this.#auth.getToken("ydb", this.#configName, { force, signal });
+    return this.#auth.getToken('ydb', { force, signal });
   }
 }
 
@@ -50,16 +48,15 @@ class YdbAdapterCredentialsProvider extends CredentialsProvider {
  *   @ydbjs/auth (requires options.endpoint; it performs the gRPC login).
  * - "anonymous" → AnonymousCredentialsProvider from @ydbjs/auth.
  * - everything else → a thin CredentialsProvider delegating getToken() to
- *   auth.getToken('ydb', configName), including usage validation.
+ *   auth.getToken('ydb'), including usage validation.
  */
 export function createYdbCredentialsProvider(
   auth: AuthManager,
-  configName?: string,
   options: YdbCredentialsAdapterOptions = {},
 ): CredentialsProvider {
-  const config = auth.resolveConfig("ydb", configName);
+  const config = auth.config;
 
-  if (config.type === "static") {
+  if (config.type === 'static') {
     if (!options.endpoint) {
       throw new AuthConfigurationError(
         'The "static" (username/password) strategy requires options.endpoint ' +
@@ -75,9 +72,9 @@ export function createYdbCredentialsProvider(
     );
   }
 
-  if (config.type === "anonymous") {
+  if (config.type === 'anonymous') {
     return new AnonymousCredentialsProvider();
   }
 
-  return new YdbAdapterCredentialsProvider(auth, configName);
+  return new YdbAdapterCredentialsProvider(auth);
 }

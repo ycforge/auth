@@ -6,16 +6,17 @@ import {
   type ModuleMetadata,
   type OptionalFactoryDependency,
   type Provider,
-} from "@nestjs/common";
+} from '@nestjs/common';
 
-import { createAuth, type AuthManagerConfig } from "../core/manager.js";
+import { createAuth } from '../core/manager.js';
+import type { AuthStrategyConfig } from '../core/types.js';
 
 /** DI token for the AuthManager provided by YcAuthModule. */
-export const YCFORGE_AUTH = Symbol("YCFORGE_AUTH");
+export const YCFORGE_AUTH = Symbol('YCFORGE_AUTH');
 
 export interface YcAuthModuleOptions {
-  /** Auth manager configuration (single config or named configs). */
-  config: AuthManagerConfig;
+  /** Single auth strategy configuration. */
+  config: AuthStrategyConfig;
   /** Register the module as global (default: false). */
   global?: boolean;
 }
@@ -23,9 +24,9 @@ export interface YcAuthModuleOptions {
 export interface YcAuthModuleAsyncOptions {
   useFactory: (
     ...args: any[]
-  ) => AuthManagerConfig | Promise<AuthManagerConfig>;
+  ) => AuthStrategyConfig | Promise<AuthStrategyConfig>;
   inject?: Array<InjectionToken | OptionalFactoryDependency>;
-  imports?: ModuleMetadata["imports"];
+  imports?: ModuleMetadata['imports'];
   /** Register the module as global (default: false). */
   global?: boolean;
 }

@@ -1,14 +1,14 @@
-import crypto from "node:crypto";
+import crypto from 'node:crypto';
 
-import { AuthConfigurationError, AuthError } from "./errors.js";
-import { markNonRetryable, retry, type RetryOptions } from "./retry.js";
+import { AuthConfigurationError, AuthError } from './errors.js';
+import { markNonRetryable, retry, type RetryOptions } from './retry.js';
 import {
   BaseTokenProvider,
   parseTimestamp,
   type CachedToken,
-} from "./base-token-provider.js";
+} from './base-token-provider.js';
 
-export const IAM_TOKEN_URL = "https://iam.api.cloud.yandex.net/iam/v1/tokens";
+export const IAM_TOKEN_URL = 'https://iam.api.cloud.yandex.net/iam/v1/tokens';
 
 /** Timeout of a single IAM token-exchange HTTP request. */
 const IAM_FETCH_TIMEOUT_MS = 10_000;
@@ -32,7 +32,7 @@ export interface AuthKeyTokenProviderOptions {
    * Retry tuning for the IAM exchange. Defaults: 5 attempts,
    * base delay 100 ms, backoff factor 10.
    */
-  retry?: Pick<RetryOptions, "attempts" | "baseDelayMs" | "factor">;
+  retry?: Pick<RetryOptions, 'attempts' | 'baseDelayMs' | 'factor'>;
 }
 
 interface IamTokenResponse {
@@ -41,11 +41,11 @@ interface IamTokenResponse {
 }
 
 function errorName(err: unknown): string {
-  if (typeof err === "object" && err !== null) {
+  if (typeof err === 'object' && err !== null) {
     const name: unknown = (err as { name?: unknown }).name;
-    return typeof name === "string" ? name : "";
+    return typeof name === 'string' ? name : '';
   }
-  return "";
+  return '';
 }
 
 /**
@@ -57,7 +57,7 @@ function errorName(err: unknown): string {
 export class AuthKeyTokenProvider extends BaseTokenProvider {
   #credentials: AuthKeyCredentials;
   #fetchTimeoutMs: number;
-  #retry?: Pick<RetryOptions, "attempts" | "baseDelayMs" | "factor">;
+  #retry?: Pick<RetryOptions, 'attempts' | 'baseDelayMs' | 'factor'>;
 
   constructor(
     credentials: AuthKeyCredentials,
@@ -69,7 +69,7 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
     this.#retry = options.retry;
     if (!(this.#fetchTimeoutMs > 0)) {
       throw new AuthConfigurationError(
-        "fetchTimeoutMs must be a positive number",
+        'fetchTimeoutMs must be a positive number',
       );
     }
   }
@@ -82,8 +82,8 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
         let response: Response;
         try {
           response = await fetch(IAM_TOKEN_URL, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ jwt }),
             signal: this.#withFetchTimeout(attemptSignal),
           });
@@ -106,7 +106,7 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
           // Invalid JSON is deterministic — do not retry, do not trust the body.
           throw markNonRetryable(
             new AuthError(
-              "IAM token exchange failed: response is not valid JSON",
+              'IAM token exchange failed: response is not valid JSON',
               {
                 cause: err,
               },
@@ -114,9 +114,9 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
           );
         }
 
-        if (typeof payload.iamToken !== "string" || payload.iamToken === "") {
+        if (typeof payload.iamToken !== 'string' || payload.iamToken === '') {
           throw markNonRetryable(
-            new AuthError("IAM token exchange failed: no iamToken in response"),
+            new AuthError('IAM token exchange failed: no iamToken in response'),
           );
         }
 
@@ -159,20 +159,20 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
   #normalizeFetchError(err: unknown): Error {
     const errName = errorName(err);
 
-    if (errName === "TimeoutError") {
+    if (errName === 'TimeoutError') {
       const error = new AuthError(
         `IAM token exchange timed out after ${this.#fetchTimeoutMs} ms`,
       );
-      error.name = "TimeoutError";
+      error.name = 'TimeoutError';
       return error;
     }
-    if (errName === "AbortError") {
+    if (errName === 'AbortError') {
       const message =
         err instanceof Error && err.message
           ? err.message
-          : "IAM token exchange aborted";
+          : 'IAM token exchange aborted';
       const error = new AuthError(message);
-      error.name = "AbortError";
+      error.name = 'AbortError';
       if (err instanceof Error && err.stack) error.stack = err.stack;
       return error;
     }
@@ -187,8 +187,8 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
     const now = Math.floor(Date.now() / 1000);
 
     const header = {
-      alg: "PS256",
-      typ: "JWT",
+      alg: 'PS256',
+      typ: 'JWT',
       kid: this.#credentials.keyId,
     };
 
@@ -201,20 +201,20 @@ export class AuthKeyTokenProvider extends BaseTokenProvider {
     };
 
     const encodedHeader = Buffer.from(JSON.stringify(header)).toString(
-      "base64url",
+      'base64url',
     );
     const encodedPayload = Buffer.from(JSON.stringify(payload)).toString(
-      "base64url",
+      'base64url',
     );
     const signingInput = `${encodedHeader}.${encodedPayload}`;
 
     const privateKey = crypto.createPrivateKey(this.#credentials.privateKey);
-    const signature = crypto.sign("sha256", Buffer.from(signingInput), {
+    const signature = crypto.sign('sha256', Buffer.from(signingInput), {
       key: privateKey,
       padding: crypto.constants.RSA_PKCS1_PSS_PADDING,
       saltLength: crypto.constants.RSA_PSS_SALTLEN_DIGEST,
     });
 
-    return `${signingInput}.${signature.toString("base64url")}`;
+    return `${signingInput}.${signature.toString('base64url')}`;
   }
 }

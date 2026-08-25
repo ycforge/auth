@@ -1,11 +1,11 @@
-import { AuthError } from "./errors.js";
-import { retry } from "./retry.js";
-import { BaseTokenProvider, type CachedToken } from "./base-token-provider.js";
+import { AuthError } from './errors.js';
+import { retry } from './retry.js';
+import { BaseTokenProvider, type CachedToken } from './base-token-provider.js';
 
 const DEFAULT_METADATA_ENDPOINT =
-  "http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token";
+  'http://169.254.169.254/computeMetadata/v1/instance/service-accounts/default/token';
 
-const DEFAULT_METADATA_FLAVOR = "Google";
+const DEFAULT_METADATA_FLAVOR = 'Google';
 
 /** Default TTL when the metadata response omits expires_in (seconds). */
 const DEFAULT_EXPIRES_IN_SEC = 3600;
@@ -40,7 +40,7 @@ export class MetadataTokenProvider extends BaseTokenProvider {
         let response: Response;
         try {
           response = await fetch(this.#endpoint, {
-            headers: { "Metadata-Flavor": this.#flavor },
+            headers: { 'Metadata-Flavor': this.#flavor },
             signal: attemptSignal,
           });
         } catch (err) {
@@ -60,8 +60,8 @@ export class MetadataTokenProvider extends BaseTokenProvider {
         }
 
         const data = (await response.json()) as MetadataTokenResponse;
-        if (typeof data.access_token !== "string" || data.access_token === "") {
-          throw new AuthError("No access_token in metadata response");
+        if (typeof data.access_token !== 'string' || data.access_token === '') {
+          throw new AuthError('No access_token in metadata response');
         }
 
         const expiresIn = data.expires_in ?? DEFAULT_EXPIRES_IN_SEC;
